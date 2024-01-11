@@ -236,7 +236,7 @@ export default class App {
 		const currentImage = this.images.find((image) => image.name === this.image.image);
 		this.imageAspect = currentImage.width / currentImage.height;
 		let a1, a2;
-		if (this.width / this.height > this.imageAspect) {
+		if (this.width / this.height < this.imageAspect) {
 			a1 = this.width / this.height / this.imageAspect;
 			a2 = 1;
 		} else {
