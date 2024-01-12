@@ -22,7 +22,7 @@
 
 html,
 body {
-	overflow-x: clip;
+	overflow: hidden;
 }
 
 body {

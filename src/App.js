@@ -22,6 +22,7 @@ import { OrbitControls } from "three/examples/jsm/Addons";
 import vertexShader from "./shaders/vertex.glsl";
 import fragmentShader from "./shaders/fragment.glsl";
 import GUI from "lil-gui";
+import { isTouchEnabledDevice } from "./helpers";
 
 export default class App {
 	constructor() {
@@ -30,6 +31,7 @@ export default class App {
 
 	init() {
 		console.log("App initialised");
+		this.isMobile = isTouchEnabledDevice();
 		// viewport
 		this.width = window.innerWidth;
 		this.height = window.innerHeight;
@@ -45,9 +47,20 @@ export default class App {
 		this.images = [
 			{ name: "/image.jpg", width: 1920, height: 2400 },
 			{ name: "/image2.jpg", width: 1920, height: 1280 },
+			{ name: "/image3.jpg", width: 1920, height: 2880 },
+			{ name: "/image4.jpg", width: 1920, height: 1300 },
+			{ name: "/image5.jpg", width: 1920, height: 2880 },
+			{ name: "/image6.jpg", width: 1920, height: 2400 },
 		];
-		this.imageUrls = { "3D Art": "/image.jpg", Human: "/image2.jpg" };
-		this.image = { image: this.imageUrls["3D Art"] };
+		this.imageUrls = {
+			"Image 1": "/image.jpg",
+			"Image 2": "/image2.jpg",
+			"Image 3": "/image3.jpg",
+			"Image 4": "/image4.jpg",
+			"Image 5": "/image5.jpg",
+			"Image 6": "/image6.jpg",
+		};
+		this.image = { image: this.imageUrls["Image 1"] };
 
 		this.createMouseEventListeners();
 		this.createComponents();
@@ -56,23 +69,32 @@ export default class App {
 		this.render();
 	}
 
+	onMouseMove = (e) => {
+		const clientX = !this.isMobile ? e.clientX : e.touches[0].clientX;
+		const clientY = !this.isMobile ? e.clientY : e.touches[0].clientY;
+
+		this.mouse.x = clientX / this.width;
+		this.mouse.y = clientY / this.height;
+
+		this.mouse.vX = this.mouse.x - this.mouse.prevX;
+		this.mouse.vY = this.mouse.y - this.mouse.prevY;
+
+		this.mouse.prevX = this.mouse.x;
+		this.mouse.prevY = this.mouse.y;
+	};
+
 	createMouseEventListeners() {
-		window.addEventListener("mousemove", (e) => {
-			this.mouse.x = e.clientX / this.width;
-			this.mouse.y = e.clientY / this.height;
-
-			this.mouse.vX = this.mouse.x - this.mouse.prevX;
-			this.mouse.vY = this.mouse.y - this.mouse.prevY;
-
-			this.mouse.prevX = this.mouse.x;
-			this.mouse.prevY = this.mouse.y;
-		});
+		if (this.isMobile) {
+			window.addEventListener("touchmove", this.onMouseMove);
+		} else {
+			window.addEventListener("mousemove", this.onMouseMove);
+		}
 	}
 
 	createComponents() {
 		this.createRenderer();
 		this.createCamera();
-		this.createControls();
+		// this.createControls();
 		this.createScene();
 		this.createObjects();
 		this.createGUI();
@@ -133,11 +155,11 @@ export default class App {
 
 	createObjects() {
 		// create a buffer with color data
-		this.cellSize = 64;
-		const width = this.cellSize;
-		const height = this.cellSize / 2;
+		this.cellSize = this.isMobile ? 24 : 64;
+		this.dataTextureWidth = this.cellSize;
+		this.dataTextureHeight = this.isMobile ? this.cellSize * 2 : this.cellSize / 2;
 
-		const size = width * height;
+		const size = this.dataTextureWidth * this.dataTextureHeight;
 		const data = new Float32Array(4 * size);
 
 		for (let i = 0; i < size; i++) {
@@ -150,7 +172,14 @@ export default class App {
 		}
 
 		// used the buffer to create a DataTexture
-		this.dataTexture = new DataTexture(data, width, height, RGBAFormat, FloatType, ACESFilmicToneMapping);
+		this.dataTexture = new DataTexture(
+			data,
+			this.dataTextureWidth,
+			this.dataTextureHeight,
+			RGBAFormat,
+			FloatType,
+			ACESFilmicToneMapping
+		);
 		this.dataTexture.minFilter = this.dataTexture.magFilter = NearestFilter;
 		this.dataTexture.needsUpdate = true;
 
@@ -185,30 +214,30 @@ export default class App {
 	updateDataTexture() {
 		let data = this.dataTexture.image.data;
 		for (let i = 0; i < data.length; i += 4) {
-			data[i] *= 0.9;
-			data[i + 1] *= 0.9;
-			data[i + 2] *= 0.9;
-			data[i + 3] *= 0.9;
+			data[i] *= 0.92;
+			data[i + 1] *= 0.92;
+			data[i + 2] *= 0.92;
+			data[i + 3] *= 0.92;
 		}
 
-		let gridMouseX = this.cellSize * this.mouse.x;
-		let gridMouseY = (this.cellSize / 2) * (1 - this.mouse.y);
-		let maxDistance = this.cellSize / 8;
+		let gridMouseX = this.dataTextureWidth * this.mouse.x;
+		let gridMouseY = this.dataTextureHeight * (1 - this.mouse.y);
+		let maxDistance = this.isMobile ? this.dataTextureWidth / 4 : this.dataTextureWidth / 8;
 
-		for (let i = 0; i < this.cellSize; i++) {
-			for (let j = 0; j < this.cellSize; j++) {
+		for (let i = 0; i < this.dataTextureWidth; i++) {
+			for (let j = 0; j < this.dataTextureHeight; j++) {
 				let distance = (gridMouseX - i) ** 2 + (gridMouseY - j) ** 2;
 				let maxSq = maxDistance ** 2;
 
 				if (distance < maxSq) {
-					let index = 4 * (i + this.cellSize * j);
+					let index = 4 * (i + this.dataTextureWidth * j);
 					let power = maxDistance / Math.sqrt(distance);
 					if (distance < 1) power = 1;
 
-					data[index] += this.mouse.vX * power * 12;
-					data[index + 1] -= this.mouse.vY * power * 12;
-					data[index + 2] += this.mouse.vY * power * 12;
-					data[index + 3] -= this.mouse.vY * power * 12;
+					data[index] += this.mouse.vX * power * 24;
+					data[index + 1] -= this.mouse.vY * power * 24;
+					data[index + 2] += this.mouse.vX * power * 24;
+					data[index + 3] -= this.mouse.vY * power * 24;
 				}
 			}
 		}
@@ -223,7 +252,6 @@ export default class App {
 		this.gui = new GUI();
 
 		this.gui
-			.addFolder("Image")
 			.add(this.image, "image", this.imageUrls)
 			.listen()
 			.onChange(async (e) => {
@@ -264,7 +292,7 @@ export default class App {
 		this.time += 0.05;
 		this.material.uniforms.uTime.value = this.time;
 		this.renderer.render(this.scene, this.camera);
-		this.controls.update();
+		// this.controls.update();
 		this.updateDataTexture();
 	}
 }
